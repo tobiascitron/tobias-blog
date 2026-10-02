@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Tobias Citron</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  main { max-width: 760px; }
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.95rem;
+  }
+  .panel h2 { margin-top: 0; font-family: Charter, Georgia, serif; }
+  label { display: block; margin: 1rem 0 0.3rem; font-weight: 600; }
+  input[type=text], input[type=date], textarea {
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.95rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  textarea { font-family: ui-monospace, Menlo, monospace; min-height: 220px; resize: vertical; }
+  button {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    margin-top: 1rem;
+    margin-right: 0.5rem;
+  }
+  button.secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+  button.danger { background: transparent; color: #c0392b; border-color: #c0392b; }
+  .post-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .post-row:last-child { border-bottom: none; }
+  .post-row .meta { color: var(--muted); font-size: 0.85rem; }
+  .status { font-size: 0.9rem; margin-top: 0.75rem; }
+  .status.error { color: #c0392b; }
+  .status.ok { color: #2e7d32; }
+  .hint { color: var(--muted); font-size: 0.85rem; }
+  #editor-panel { display: none; }
+</style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">Tobias Citron</a></h1>
+    <p>Admin</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about.html">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="panel" id="connect-panel">
+      <h2>Connect</h2>
+      <p class="hint">
+        Paste a GitHub personal access token with write access to the
+        <code>tobiascitron/tobias-blog</code> repo. It's saved only in this browser.
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a>
+        scoped to just this repo with Contents: Read and write.
+      </p>
+      <input type="text" id="token-input" placeholder="github_pat_...">
+      <button id="connect-btn">Connect</button>
+      <p class="status" id="connect-status"></p>
+    </div>
+
+    <div class="panel" id="app-panel" style="display:none">
+      <h2>Posts</h2>
+      <button id="new-post-btn">+ New post</button>
+      <button class="secondary" id="disconnect-btn">Disconnect</button>
+      <div id="post-list"></div>
+      <p class="status" id="list-status"></p>
+    </div>
+
+    <div class="panel" id="editor-panel">
+      <h2 id="editor-heading">New post</h2>
+      <label for="f-title">Title</label>
+      <input type="text" id="f-title">
+      <label for="f-date">Date</label>
+      <input type="date" id="f-date">
+      <label for="f-excerpt">Excerpt (shown on the home page)</label>
+      <input type="text" id="f-excerpt">
+      <label for="f-body">Body</label>
+      <p class="hint">Basic HTML: &lt;p&gt;, &lt;h2&gt;, &lt;h3&gt;, &lt;a&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;img&gt;, &lt;blockquote&gt;, &lt;pre&gt;&lt;code&gt;. One top-level &lt;div&gt; isn't supported inside the body.</p>
+      <textarea id="f-body"></textarea>
+      <div>
+        <button id="save-btn">Publish</button>
+        <button class="secondary" id="cancel-btn">Cancel</button>
+        <button class="danger" id="delete-btn" style="display:none">Delete post</button>
+      </div>
+      <p class="status" id="editor-status"></p>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Tobias Citron. Built with plain HTML.</p>
+  </footer>
+
+<script>
+const OWNER = 'tobiascitron';
+const REPO = 'tobias-blog';
+const BRANCH = 'main';
+const API = 'https://api.github.com';
+const TOKEN_KEY = 'tobias_blog_pat';
+
+function b64Encode(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function b64Decode(b64) {
+  return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
+}
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function slugify(title) {
+  return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '') || 'post';
+}
+function formatDate(isoDate) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+function toInputDate(longDate) {
+  const d = new Date(longDate);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+function ghHeaders() {
+  return {
+    'Authorization': `token ${getToken()}`,
+    'Accept': 'application/vnd.github+json',
+  };
+}
+
+async function getFile(path) {
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`, { headers: ghHeaders() });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Couldn't load ${path} (${res.status})`);
+  const data = await res.json();
+  return { sha: data.sha, content: b64Decode(data.content) };
+}
+
+async function putFile(path, content, sha, message) {
+  const body = { message, content: b64Encode(content), branch: BRANCH };
+  if (sha) body.sha = sha;
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Couldn't save ${path} (${res.status})`);
+  }
+  return res.json();
+}
+
+async function deleteFile(path, sha, message) {
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/${path}`, {
+    method: 'DELETE',
+    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sha, branch: BRANCH }),
+  });
+  if (!res.ok) throw new Error(`Couldn't delete ${path} (${res.status})`);
+}
+
+function renderPostFile({ title, date, body }) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} — Tobias Citron</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header>
+    <h1><a href="/">Tobias Citron</a></h1>
+    <p>Notes on things I'm thinking about.</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about.html">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <a class="back-link" href="/">&larr; Back to all posts</a>
+    <article>
+      <header>
+        <h1 data-field="title">${escapeHtml(title)}</h1>
+        <p class="post-meta" data-field="date">${escapeHtml(date)}</p>
+      </header>
+      <div data-field="body">
+        ${body}
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Tobias Citron. Built with plain HTML.</p>
+  </footer>
+</body>
+</html>
+`;
+}
+
+function parsePostFile(raw) {
+  const title = (raw.match(/<h1 data-field="title">([\s\S]*?)<\/h1>/) || [, ''])[1].trim();
+  const date = (raw.match(/<p class="post-meta" data-field="date">([\s\S]*?)<\/p>/) || [, ''])[1].trim();
+  const body = (raw.match(/<div data-field="body">([\s\S]*?)<\/div>\s*<\/article>/) || [, ''])[1].trim();
+  return { title, date, body };
+}
+
+function renderListItem({ slug, title, date, excerpt }) {
+  return `      <li data-slug="${slug}">
+        <span class="date">${escapeHtml(date)}</span>
+        <a href="/posts/${slug}.html">${escapeHtml(title)}</a>
+        <p class="excerpt">${escapeHtml(excerpt)}</p>
+      </li>\n`;
+}
+
+function parseIndexEntries(raw) {
+  const entries = [];
+  const re = /<li data-slug="([^"]+)">([\s\S]*?)<\/li>/g;
+  let m;
+  while ((m = re.exec(raw))) {
+    const slug = m[1];
+    const block = m[2];
+    const date = (block.match(/<span class="date">([\s\S]*?)<\/span>/) || [, ''])[1].trim();
+    const title = (block.match(/<a href="[^"]*">([\s\S]*?)<\/a>/) || [, ''])[1].trim();
+    const excerpt = (block.match(/<p class="excerpt">([\s\S]*?)<\/p>/) || [, ''])[1].trim();
+    entries.push({ slug, date, title, excerpt });
+  }
+  return entries;
+}
+
+function replaceOrInsertListItem(raw, slug, newItemHtml) {
+  const itemRe = new RegExp(`      <li data-slug="${slug}">[\\s\\S]*?<\\/li>\\n`);
+  if (itemRe.test(raw)) {
+    return raw.replace(itemRe, newItemHtml);
+  }
+  return raw.replace(/(<ul class="post-list">\n)/, `$1${newItemHtml}`);
+}
+
+function removeListItem(raw, slug) {
+  const itemRe = new RegExp(`      <li data-slug="${slug}">[\\s\\S]*?<\\/li>\\n`);
+  return raw.replace(itemRe, '');
+}
+
+// --- UI wiring ---
+
+const connectPanel = document.getElementById('connect-panel');
+const appPanel = document.getElementById('app-panel');
+const editorPanel = document.getElementById('editor-panel');
+const tokenInput = document.getElementById('token-input');
+const connectStatus = document.getElementById('connect-status');
+const listStatus = document.getElementById('list-status');
+const editorStatus = document.getElementById('editor-status');
+const postListEl = document.getElementById('post-list');
+const editorHeading = document.getElementById('editor-heading');
+const fTitle = document.getElementById('f-title');
+const fDate = document.getElementById('f-date');
+const fExcerpt = document.getElementById('f-excerpt');
+const fBody = document.getElementById('f-body');
+const deleteBtn = document.getElementById('delete-btn');
+
+let editingSlug = null; // null => creating a new post
+
+function showApp() {
+  connectPanel.style.display = 'none';
+  appPanel.style.display = 'block';
+  editorPanel.style.display = 'none';
+  loadPostList();
+}
+
+async function loadPostList() {
+  listStatus.textContent = 'Loading…';
+  listStatus.className = 'status';
+  try {
+    const file = await getFile('index.html');
+    const entries = parseIndexEntries(file.content);
+    postListEl.innerHTML = '';
+    entries.forEach(entry => {
+      const row = document.createElement('div');
+      row.className = 'post-row';
+      row.innerHTML = `
+        <div>
+          <strong>${escapeHtml(entry.title)}</strong>
+          <div class="meta">${escapeHtml(entry.date)}</div>
+        </div>
+        <div>
+          <button class="secondary" data-edit="${entry.slug}">Edit</button>
+        </div>`;
+      postListEl.appendChild(row);
+    });
+    postListEl.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => openEditor(btn.getAttribute('data-edit')));
+    });
+    listStatus.textContent = '';
+  } catch (e) {
+    listStatus.textContent = e.message;
+    listStatus.className = 'status error';
+    if (String(e.message).includes('401')) showConnect();
+  }
+}
+
+function showConnect() {
+  connectPanel.style.display = 'block';
+  appPanel.style.display = 'none';
+  editorPanel.style.display = 'none';
+}
+
+async function openEditor(slug) {
+  editorPanel.style.display = 'block';
+  editorStatus.textContent = '';
+  if (!slug) {
+    editingSlug = null;
+    editorHeading.textContent = 'New post';
+    fTitle.value = '';
+    fDate.value = toInputDate(new Date().toDateString());
+    fExcerpt.value = '';
+    fBody.value = '<p></p>';
+    deleteBtn.style.display = 'none';
+    fTitle.focus();
+    return;
+  }
+  editingSlug = slug;
+  editorHeading.textContent = 'Edit post';
+  editorStatus.textContent = 'Loading…';
+  deleteBtn.style.display = 'inline-block';
+  try {
+    const [postFile, indexFile] = await Promise.all([getFile(`posts/${slug}.html`), getFile('index.html')]);
+    const parsed = parsePostFile(postFile.content);
+    const entries = parseIndexEntries(indexFile.content);
+    const entry = entries.find(e => e.slug === slug) || {};
+    fTitle.value = parsed.title;
+    fDate.value = toInputDate(parsed.date);
+    fExcerpt.value = entry.excerpt || '';
+    fBody.value = parsed.body;
+    editorStatus.textContent = '';
+  } catch (e) {
+    editorStatus.textContent = e.message;
+    editorStatus.className = 'status error';
+  }
+}
+
+document.getElementById('connect-btn').addEventListener('click', async () => {
+  const token = tokenInput.value.trim();
+  if (!token) return;
+  localStorage.setItem(TOKEN_KEY, token);
+  connectStatus.textContent = 'Checking…';
+  connectStatus.className = 'status';
+  try {
+    await getFile('index.html');
+    connectStatus.textContent = '';
+    showApp();
+  } catch (e) {
+    connectStatus.textContent = `Couldn't connect: ${e.message}`;
+    connectStatus.className = 'status error';
+    localStorage.removeItem(TOKEN_KEY);
+  }
+});
+
+document.getElementById('disconnect-btn').addEventListener('click', () => {
+  localStorage.removeItem(TOKEN_KEY);
+  showConnect();
+});
+
+document.getElementById('new-post-btn').addEventListener('click', () => openEditor(null));
+document.getElementById('cancel-btn').addEventListener('click', () => {
+  editorPanel.style.display = 'none';
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const title = fTitle.value.trim();
+  const dateIso = fDate.value;
+  const excerpt = fExcerpt.value.trim();
+  const body = fBody.value.trim();
+  if (!title || !dateIso) {
+    editorStatus.textContent = 'Title and date are required.';
+    editorStatus.className = 'status error';
+    return;
+  }
+  const date = formatDate(dateIso);
+  editorStatus.textContent = 'Publishing…';
+  editorStatus.className = 'status';
+  try {
+    let slug = editingSlug;
+    let postSha = null;
+    if (slug) {
+      const existing = await getFile(`posts/${slug}.html`);
+      postSha = existing ? existing.sha : null;
+    } else {
+      slug = slugify(title);
+      const indexFileCheck = await getFile('index.html');
+      const existingSlugs = parseIndexEntries(indexFileCheck.content).map(e => e.slug);
+      let candidate = slug, n = 2;
+      while (existingSlugs.includes(candidate)) { candidate = `${slug}-${n++}`; }
+      slug = candidate;
+    }
+
+    const postContent = renderPostFile({ title, date, body });
+    await putFile(`posts/${slug}.html`, postContent, postSha, `${postSha ? 'Update' : 'Add'} post: ${title}`);
+
+    const indexFile = await getFile('index.html');
+    const newItemHtml = renderListItem({ slug, title, date, excerpt });
+    const updatedIndex = replaceOrInsertListItem(indexFile.content, slug, newItemHtml);
+    await putFile('index.html', updatedIndex, indexFile.sha, `Update post list: ${title}`);
+
+    editorStatus.textContent = 'Published! Live in ~10 seconds.';
+    editorStatus.className = 'status ok';
+    loadPostList();
+  } catch (e) {
+    editorStatus.textContent = e.message;
+    editorStatus.className = 'status error';
+  }
+});
+
+deleteBtn.addEventListener('click', async () => {
+  if (!editingSlug) return;
+  if (!confirm(`Delete "${fTitle.value}"? This can't be undone from here.`)) return;
+  editorStatus.textContent = 'Deleting…';
+  editorStatus.className = 'status';
+  try {
+    const postFile = await getFile(`posts/${editingSlug}.html`);
+    if (postFile) await deleteFile(`posts/${editingSlug}.html`, postFile.sha, `Delete post: ${fTitle.value}`);
+    const indexFile = await getFile('index.html');
+    const updatedIndex = removeListItem(indexFile.content, editingSlug);
+    await putFile('index.html', updatedIndex, indexFile.sha, `Remove post from list: ${fTitle.value}`);
+    editorPanel.style.display = 'none';
+    loadPostList();
+  } catch (e) {
+    editorStatus.textContent = e.message;
+    editorStatus.className = 'status error';
+  }
+});
+
+if (getToken()) {
+  showApp();
+} else {
+  showConnect();
+}
+</script>
+</body>
+</html>

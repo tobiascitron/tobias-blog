@@ -111,8 +111,13 @@
       <label for="f-excerpt">Excerpt (shown on the home page)</label>
       <input type="text" id="f-excerpt">
       <label for="f-body">Body</label>
-      <p class="hint">Basic HTML: &lt;p&gt;, &lt;h2&gt;, &lt;h3&gt;, &lt;a&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;img&gt;, &lt;blockquote&gt;, &lt;pre&gt;&lt;code&gt;. One top-level &lt;div&gt; isn't supported inside the body.</p>
-      <textarea id="f-body"></textarea>
+      <p class="hint">Just write. Leave a blank line between paragraphs. A few shortcuts also work: <code>## heading</code>, <code>### subheading</code>, <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code>, <code>[link](url)</code>, <code>![alt](image-url)</code>, <code>&gt; quote</code>, and a line of <code>```</code> before/after a block for code.</p>
+      <textarea id="f-body" placeholder="Just start writing.
+
+Leave a blank line between paragraphs like this one.
+
+## Optional heading
+**bold**, *italic*, and [links](https://example.com) all work inline."></textarea>
       <div>
         <button id="save-btn">Publish</button>
         <button class="secondary" id="cancel-btn">Cancel</button>
@@ -144,6 +149,76 @@ function escapeHtml(str) {
 }
 function slugify(title) {
   return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '') || 'post';
+}
+
+function mdInlineToHtml(text) {
+  let s = escapeHtml(text);
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) => `<a href="${u}">${t}</a>`);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return s;
+}
+
+// Lightweight markdown-ish syntax -> HTML, so the body field can be written free-form
+// instead of hand-typed tags. Paired with htmlToMarkdown() below for round-tripping on edit.
+function mdToHtml(markdown) {
+  const blocks = markdown.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+  return blocks.map(block => {
+    if (/^```/.test(block)) {
+      const code = block.replace(/^```[a-zA-Z0-9]*\n?/, '').replace(/```$/, '');
+      return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
+    }
+    const imgMatch = block.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) return `<img src="${escapeHtml(imgMatch[2])}" alt="${escapeHtml(imgMatch[1])}">`;
+    if (/^### /.test(block)) return `<h3>${mdInlineToHtml(block.slice(4))}</h3>`;
+    if (/^## /.test(block)) return `<h2>${mdInlineToHtml(block.slice(3))}</h2>`;
+    if (/^> /.test(block)) {
+      const inner = block.split('\n').map(l => l.replace(/^>\s?/, '')).join(' ');
+      return `<blockquote><p>${mdInlineToHtml(inner)}</p></blockquote>`;
+    }
+    return `<p>${block.split('\n').map(mdInlineToHtml).join('<br>\n')}</p>`;
+  }).join('\n        ');
+}
+
+function inlineNodeToMarkdown(el) {
+  let result = '';
+  el.childNodes.forEach(node => {
+    if (node.nodeType === 3) { result += node.textContent; return; }
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'strong' || tag === 'b') result += `**${inlineNodeToMarkdown(node)}**`;
+    else if (tag === 'em' || tag === 'i') result += `*${inlineNodeToMarkdown(node)}*`;
+    else if (tag === 'code') result += `\`${node.textContent}\``;
+    else if (tag === 'a') result += `[${inlineNodeToMarkdown(node)}](${node.getAttribute('href')})`;
+    else if (tag === 'br') result += '\n';
+    else result += inlineNodeToMarkdown(node);
+  });
+  return result;
+}
+
+// Inverse of mdToHtml, using the browser's own HTML parser rather than regex
+// since the body can contain nested inline tags once it's real HTML again.
+function htmlToMarkdown(html) {
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const blocks = [];
+  container.childNodes.forEach(node => {
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'h2') blocks.push('## ' + inlineNodeToMarkdown(node));
+    else if (tag === 'h3') blocks.push('### ' + inlineNodeToMarkdown(node));
+    else if (tag === 'blockquote') {
+      const parts = Array.from(node.children).map(p => inlineNodeToMarkdown(p));
+      blocks.push('> ' + (parts.join(' ') || inlineNodeToMarkdown(node)));
+    } else if (tag === 'pre') {
+      blocks.push('```\n' + node.textContent.trim() + '\n```');
+    } else if (tag === 'img') {
+      blocks.push(`![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`);
+    } else {
+      blocks.push(inlineNodeToMarkdown(node));
+    }
+  });
+  return blocks.join('\n\n');
 }
 function formatDate(isoDate) {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -352,7 +427,7 @@ async function openEditor(slug) {
     fTitle.value = '';
     fDate.value = toInputDate(new Date().toDateString());
     fExcerpt.value = '';
-    fBody.value = '<p></p>';
+    fBody.value = '';
     deleteBtn.style.display = 'none';
     fTitle.focus();
     return;
@@ -369,7 +444,7 @@ async function openEditor(slug) {
     fTitle.value = parsed.title;
     fDate.value = toInputDate(parsed.date);
     fExcerpt.value = entry.excerpt || '';
-    fBody.value = parsed.body;
+    fBody.value = htmlToMarkdown(parsed.body);
     editorStatus.textContent = '';
   } catch (e) {
     editorStatus.textContent = e.message;
@@ -432,7 +507,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       slug = candidate;
     }
 
-    const postContent = renderPostFile({ title, date, body });
+    const postContent = renderPostFile({ title, date, body: mdToHtml(body) });
     await putFile(`posts/${slug}.html`, postContent, postSha, `${postSha ? 'Update' : 'Add'} post: ${title}`);
 
     const indexFile = await getFile('index.html');

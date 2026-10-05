@@ -30,16 +30,10 @@ body {
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 28px 28px;
-  animation: grid-drift 40s linear infinite;
   color: var(--fg);
   font-family: var(--sans);
   font-size: 1.0625rem;
   line-height: 1.7;
-}
-
-@keyframes grid-drift {
-  from { background-position: 0 0, 0 0; }
-  to { background-position: 0 -280px, -280px 0; }
 }
 
 main, header, footer {

@@ -9,7 +9,9 @@
 <style>
   main { max-width: 760px; }
   .panel {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid var(--border);
     border-left: 3px solid var(--accent);
     border-radius: 8px;
@@ -37,14 +39,17 @@
   }
   textarea { font-family: var(--mono); font-size: 0.9rem; min-height: 220px; resize: vertical; }
   button {
+    appearance: none;
+    -webkit-appearance: none;
     font-family: var(--mono);
     font-size: 0.85rem;
     letter-spacing: 0.02em;
     padding: 0.5rem 1.1rem;
     border-radius: 6px;
     border: 1px solid var(--accent);
-    background: var(--accent);
-    color: var(--bg);
+    background-color: var(--accent);
+    background-image: var(--gradient);
+    color: #fff;
     font-weight: 600;
     cursor: pointer;
     margin-top: 1rem;

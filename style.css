@@ -4,6 +4,8 @@
   --muted: #5b6270;
   --accent: #057a6e;
   --accent-soft: rgba(5, 122, 110, 0.1);
+  --accent2: #0e7bb8;
+  --gradient: linear-gradient(100deg, var(--accent), var(--accent2));
   --border: #dde1e7;
   --card-bg: #ffffff;
   --grid-line: rgba(18, 20, 26, 0.045);
@@ -28,10 +30,16 @@ body {
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 28px 28px;
+  animation: grid-drift 40s linear infinite;
   color: var(--fg);
   font-family: var(--sans);
   font-size: 1.0625rem;
   line-height: 1.7;
+}
+
+@keyframes grid-drift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 -280px, -280px 0; }
 }
 
 main, header, footer {
@@ -42,6 +50,17 @@ main, header, footer {
 header {
   padding: 3rem 0 1.75rem;
   border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 140px;
+  height: 1px;
+  background: var(--gradient);
 }
 
 header h1 {
@@ -53,23 +72,33 @@ header h1 {
 }
 
 header h1 a {
-  color: var(--fg);
   text-decoration: none;
+  background-image: var(--gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 header h1 a::before {
   content: "> ";
   color: var(--accent);
+  -webkit-text-fill-color: var(--accent);
 }
 
 header h1 a::after {
   content: "_";
   color: var(--accent);
-  animation: blink 1.1s steps(1) infinite;
+  -webkit-text-fill-color: var(--accent);
+  animation: blink 1.1s steps(1) infinite, glow-pulse 2.2s ease-in-out infinite;
 }
 
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 8px var(--accent-soft); }
 }
 
 header p {
@@ -85,12 +114,12 @@ nav {
 }
 
 nav a {
+  position: relative;
   color: var(--muted);
   text-decoration: none;
   margin-right: 1.5rem;
   padding-bottom: 0.2rem;
-  border-bottom: 1px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 nav a::before {
@@ -99,9 +128,23 @@ nav a::before {
   margin-right: 0.3rem;
 }
 
+nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
 nav a:hover {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+}
+
+nav a:hover::after {
+  width: 100%;
 }
 
 main {
@@ -132,16 +175,19 @@ a {
 .post-list li {
   margin-bottom: 1rem;
   padding: 1.25rem 1.4rem;
-  background: var(--card-bg);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: 8px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(18, 20, 26, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .post-list li:hover {
-  transform: translateX(3px);
-  box-shadow: 0 0 0 1px var(--accent-soft), 0 8px 24px -12px var(--accent-soft);
+  transform: translateX(3px) scale(1.005);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 10px 28px -12px rgba(5, 122, 110, 0.25);
 }
 
 .post-list .date {
@@ -197,7 +243,9 @@ article h1 {
 }
 
 article pre {
-  background: var(--card-bg);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   padding: 1rem;

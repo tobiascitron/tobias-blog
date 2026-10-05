@@ -94,7 +94,7 @@ header h1 a::after {
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% { visibility: hidden; }
 }
 
 header p {

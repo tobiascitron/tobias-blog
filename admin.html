@@ -467,8 +467,7 @@ function showConnect() {
 }
 
 function updateEditorButtons() {
-  // Save-as-draft only makes sense before a post has gone live.
-  draftBtn.style.display = editingType === 'published' ? 'none' : 'inline-block';
+  draftBtn.style.display = 'inline-block';
   deleteBtn.style.display = editingType === 'new' ? 'none' : 'inline-block';
 }
 
@@ -610,15 +609,19 @@ draftBtn.addEventListener('click', async () => {
     return;
   }
   const date = formatDate(dateIso);
+  const wasPublished = editingType === 'published';
   editorStatus.textContent = 'Saving draft…';
   editorStatus.className = 'status';
   try {
     let slug = editingSlug;
     let draftSha = null;
-    if (slug && editingType === 'draft') {
+    if (slug) {
+      // Covers both re-saving an existing draft AND saving a draft copy of an
+      // already-published post — either way, check if a drafts/ file already
+      // exists for this slug so we update it instead of trying to create a duplicate.
       const existing = await getFile(`drafts/${slug}.html`);
       draftSha = existing ? existing.sha : null;
-    } else if (!slug) {
+    } else {
       slug = await findFreeSlug(title);
     }
 
@@ -626,10 +629,14 @@ draftBtn.addEventListener('click', async () => {
     await putFile(`drafts/${slug}.html`, draftContent, draftSha, `${draftSha ? 'Update' : 'Save'} draft: ${title}`);
 
     editingSlug = slug;
-    editingType = 'draft';
-    editorHeading.textContent = 'Edit draft';
+    if (!wasPublished) {
+      editingType = 'draft';
+      editorHeading.textContent = 'Edit draft';
+    }
     updateEditorButtons();
-    editorStatus.textContent = 'Saved as draft — not published.';
+    editorStatus.textContent = wasPublished
+      ? 'Draft saved — your published post is unaffected.'
+      : 'Saved as draft — not published.';
     editorStatus.className = 'status ok';
     loadPostList();
   } catch (e) {

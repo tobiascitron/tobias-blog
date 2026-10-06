@@ -249,7 +249,7 @@ function ghHeaders() {
 }
 
 async function getFile(path) {
-  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`, { headers: ghHeaders() });
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`, { headers: ghHeaders(), cache: 'no-store' });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Couldn't load ${path} (${res.status})`);
   const data = await res.json();
@@ -366,7 +366,7 @@ function removeListItem(raw, slug) {
 }
 
 async function listDraftSlugs() {
-  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/drafts?ref=${BRANCH}`, { headers: ghHeaders() });
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/drafts?ref=${BRANCH}`, { headers: ghHeaders(), cache: 'no-store' });
   if (res.status === 404) return [];
   if (!res.ok) throw new Error(`Couldn't list drafts (${res.status})`);
   const data = await res.json();

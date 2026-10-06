@@ -68,6 +68,8 @@
   }
   .post-row:last-child { border-bottom: none; }
   .post-row .meta { color: var(--muted); font-size: 0.8rem; font-family: var(--mono); margin-top: 0.15rem; }
+  .list-heading { font-family: var(--mono); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 1.25rem 0 0.25rem; }
+  .list-heading:first-child { margin-top: 0; }
   .status { font-size: 0.9rem; margin-top: 0.75rem; font-family: var(--mono); }
   .status.error { color: #e5484d; }
   .status.ok { color: var(--accent); }
@@ -125,8 +127,9 @@ Leave a blank line between paragraphs like this one.
 **bold**, *italic*, and [links](https://example.com) all work inline."></textarea>
       <div>
         <button id="save-btn">Publish</button>
+        <button class="secondary" id="draft-btn">Save draft</button>
         <button class="secondary" id="cancel-btn">Cancel</button>
-        <button class="danger" id="delete-btn" style="display:none">Delete post</button>
+        <button class="danger" id="delete-btn" style="display:none">Delete</button>
       </div>
       <p class="status" id="editor-status"></p>
     </div>
@@ -277,12 +280,13 @@ async function deleteFile(path, sha, message) {
   if (!res.ok) throw new Error(`Couldn't delete ${path} (${res.status})`);
 }
 
-function renderPostFile({ title, date, body }) {
+function renderPostFile({ title, date, body, excerpt }) {
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="excerpt" content="${escapeHtml(excerpt || '')}">
   <title>${escapeHtml(title)} — Tobias Citron</title>
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -321,7 +325,8 @@ function parsePostFile(raw) {
   const title = (raw.match(/<h1 data-field="title">([\s\S]*?)<\/h1>/) || [, ''])[1].trim();
   const date = (raw.match(/<p class="post-meta" data-field="date">([\s\S]*?)<\/p>/) || [, ''])[1].trim();
   const body = (raw.match(/<div data-field="body">([\s\S]*?)<\/div>\s*<\/article>/) || [, ''])[1].trim();
-  return { title, date, body };
+  const excerpt = (raw.match(/<meta name="excerpt" content="([^"]*)">/) || [, ''])[1];
+  return { title, date, body, excerpt };
 }
 
 function renderListItem({ slug, title, date, excerpt }) {
@@ -360,6 +365,24 @@ function removeListItem(raw, slug) {
   return raw.replace(itemRe, '');
 }
 
+async function listDraftSlugs() {
+  const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/drafts?ref=${BRANCH}`, { headers: ghHeaders() });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`Couldn't list drafts (${res.status})`);
+  const data = await res.json();
+  return data.filter(f => f.name.endsWith('.html')).map(f => f.name.replace(/\.html$/, ''));
+}
+
+async function listDrafts() {
+  const slugs = await listDraftSlugs();
+  const drafts = await Promise.all(slugs.map(async slug => {
+    const file = await getFile(`drafts/${slug}.html`);
+    const parsed = parsePostFile(file.content);
+    return { slug, title: parsed.title, date: parsed.date };
+  }));
+  return drafts;
+}
+
 // --- UI wiring ---
 
 const connectPanel = document.getElementById('connect-panel');
@@ -376,8 +399,10 @@ const fDate = document.getElementById('f-date');
 const fExcerpt = document.getElementById('f-excerpt');
 const fBody = document.getElementById('f-body');
 const deleteBtn = document.getElementById('delete-btn');
+const draftBtn = document.getElementById('draft-btn');
 
 let editingSlug = null; // null => creating a new post
+let editingType = 'new'; // 'new' | 'draft' | 'published'
 
 function showApp() {
   connectPanel.style.display = 'none';
@@ -386,28 +411,46 @@ function showApp() {
   loadPostList();
 }
 
+function renderPostRows(items, type) {
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'post-row';
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <div class="meta">${escapeHtml(item.date)}</div>
+      </div>
+      <div>
+        <button class="secondary" data-edit="${item.slug}" data-type="${type}">Edit</button>
+      </div>`;
+    postListEl.appendChild(row);
+  });
+}
+
 async function loadPostList() {
   listStatus.textContent = 'Loading…';
   listStatus.className = 'status';
   try {
-    const file = await getFile('index.html');
-    const entries = parseIndexEntries(file.content);
+    const [indexFile, drafts] = await Promise.all([getFile('index.html'), listDrafts()]);
+    const published = parseIndexEntries(indexFile.content);
     postListEl.innerHTML = '';
-    entries.forEach(entry => {
-      const row = document.createElement('div');
-      row.className = 'post-row';
-      row.innerHTML = `
-        <div>
-          <strong>${escapeHtml(entry.title)}</strong>
-          <div class="meta">${escapeHtml(entry.date)}</div>
-        </div>
-        <div>
-          <button class="secondary" data-edit="${entry.slug}">Edit</button>
-        </div>`;
-      postListEl.appendChild(row);
-    });
+
+    const publishedHeading = document.createElement('div');
+    publishedHeading.className = 'list-heading';
+    publishedHeading.textContent = 'Published';
+    postListEl.appendChild(publishedHeading);
+    renderPostRows(published, 'published');
+
+    if (drafts.length) {
+      const draftsHeading = document.createElement('div');
+      draftsHeading.className = 'list-heading';
+      draftsHeading.textContent = 'Drafts';
+      postListEl.appendChild(draftsHeading);
+      renderPostRows(drafts, 'draft');
+    }
+
     postListEl.querySelectorAll('[data-edit]').forEach(btn => {
-      btn.addEventListener('click', () => openEditor(btn.getAttribute('data-edit')));
+      btn.addEventListener('click', () => openEditor(btn.getAttribute('data-edit'), btn.getAttribute('data-type')));
     });
     listStatus.textContent = '';
   } catch (e) {
@@ -423,32 +466,45 @@ function showConnect() {
   editorPanel.style.display = 'none';
 }
 
-async function openEditor(slug) {
+function updateEditorButtons() {
+  // Save-as-draft only makes sense before a post has gone live.
+  draftBtn.style.display = editingType === 'published' ? 'none' : 'inline-block';
+  deleteBtn.style.display = editingType === 'new' ? 'none' : 'inline-block';
+}
+
+async function openEditor(slug, type) {
   editorPanel.style.display = 'block';
   editorStatus.textContent = '';
   if (!slug) {
     editingSlug = null;
+    editingType = 'new';
     editorHeading.textContent = 'New post';
     fTitle.value = '';
     fDate.value = toInputDate(new Date().toDateString());
     fExcerpt.value = '';
     fBody.value = '';
-    deleteBtn.style.display = 'none';
+    updateEditorButtons();
     fTitle.focus();
     return;
   }
   editingSlug = slug;
-  editorHeading.textContent = 'Edit post';
+  editingType = type;
+  editorHeading.textContent = type === 'draft' ? 'Edit draft' : 'Edit post';
   editorStatus.textContent = 'Loading…';
-  deleteBtn.style.display = 'inline-block';
+  updateEditorButtons();
   try {
-    const [postFile, indexFile] = await Promise.all([getFile(`posts/${slug}.html`), getFile('index.html')]);
+    const path = type === 'draft' ? `drafts/${slug}.html` : `posts/${slug}.html`;
+    const [postFile, indexFile] = await Promise.all([getFile(path), getFile('index.html')]);
     const parsed = parsePostFile(postFile.content);
-    const entries = parseIndexEntries(indexFile.content);
-    const entry = entries.find(e => e.slug === slug) || {};
+    let excerpt = parsed.excerpt || '';
+    if (type === 'published') {
+      const entries = parseIndexEntries(indexFile.content);
+      const entry = entries.find(e => e.slug === slug);
+      excerpt = (entry && entry.excerpt) || excerpt;
+    }
     fTitle.value = parsed.title;
     fDate.value = toInputDate(parsed.date);
-    fExcerpt.value = entry.excerpt || '';
+    fExcerpt.value = excerpt;
     fBody.value = htmlToMarkdown(parsed.body);
     editorStatus.textContent = '';
   } catch (e) {
@@ -484,6 +540,15 @@ document.getElementById('cancel-btn').addEventListener('click', () => {
   editorPanel.style.display = 'none';
 });
 
+async function findFreeSlug(title) {
+  const base = slugify(title);
+  const [indexFileCheck, draftSlugs] = await Promise.all([getFile('index.html'), listDraftSlugs()]);
+  const taken = new Set([...parseIndexEntries(indexFileCheck.content).map(e => e.slug), ...draftSlugs]);
+  let candidate = base, n = 2;
+  while (taken.has(candidate)) { candidate = `${base}-${n++}`; }
+  return candidate;
+}
+
 document.getElementById('save-btn').addEventListener('click', async () => {
   const title = fTitle.value.trim();
   const dateIso = fDate.value;
@@ -498,21 +563,18 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   editorStatus.textContent = 'Publishing…';
   editorStatus.className = 'status';
   try {
+    const wasDraft = editingType === 'draft';
     let slug = editingSlug;
     let postSha = null;
-    if (slug) {
+    if (slug && editingType === 'published') {
       const existing = await getFile(`posts/${slug}.html`);
       postSha = existing ? existing.sha : null;
-    } else {
-      slug = slugify(title);
-      const indexFileCheck = await getFile('index.html');
-      const existingSlugs = parseIndexEntries(indexFileCheck.content).map(e => e.slug);
-      let candidate = slug, n = 2;
-      while (existingSlugs.includes(candidate)) { candidate = `${slug}-${n++}`; }
-      slug = candidate;
+    } else if (!slug) {
+      slug = await findFreeSlug(title);
     }
+    // editingType 'draft' promotes to a brand-new posts/ file, so postSha stays null.
 
-    const postContent = renderPostFile({ title, date, body: mdToHtml(body) });
+    const postContent = renderPostFile({ title, date, body: mdToHtml(body), excerpt });
     await putFile(`posts/${slug}.html`, postContent, postSha, `${postSha ? 'Update' : 'Add'} post: ${title}`);
 
     const indexFile = await getFile('index.html');
@@ -520,7 +582,54 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     const updatedIndex = replaceOrInsertListItem(indexFile.content, slug, newItemHtml);
     await putFile('index.html', updatedIndex, indexFile.sha, `Update post list: ${title}`);
 
+    if (wasDraft) {
+      const draftFile = await getFile(`drafts/${editingSlug}.html`);
+      if (draftFile) await deleteFile(`drafts/${editingSlug}.html`, draftFile.sha, `Remove draft, now published: ${title}`);
+    }
+
+    editingSlug = slug;
+    editingType = 'published';
+    updateEditorButtons();
     editorStatus.textContent = 'Published! Live in ~10 seconds.';
+    editorStatus.className = 'status ok';
+    loadPostList();
+  } catch (e) {
+    editorStatus.textContent = e.message;
+    editorStatus.className = 'status error';
+  }
+});
+
+draftBtn.addEventListener('click', async () => {
+  const title = fTitle.value.trim();
+  const dateIso = fDate.value;
+  const excerpt = fExcerpt.value.trim();
+  const body = fBody.value.trim();
+  if (!title || !dateIso) {
+    editorStatus.textContent = 'Title and date are required.';
+    editorStatus.className = 'status error';
+    return;
+  }
+  const date = formatDate(dateIso);
+  editorStatus.textContent = 'Saving draft…';
+  editorStatus.className = 'status';
+  try {
+    let slug = editingSlug;
+    let draftSha = null;
+    if (slug && editingType === 'draft') {
+      const existing = await getFile(`drafts/${slug}.html`);
+      draftSha = existing ? existing.sha : null;
+    } else if (!slug) {
+      slug = await findFreeSlug(title);
+    }
+
+    const draftContent = renderPostFile({ title, date, body: mdToHtml(body), excerpt });
+    await putFile(`drafts/${slug}.html`, draftContent, draftSha, `${draftSha ? 'Update' : 'Save'} draft: ${title}`);
+
+    editingSlug = slug;
+    editingType = 'draft';
+    editorHeading.textContent = 'Edit draft';
+    updateEditorButtons();
+    editorStatus.textContent = 'Saved as draft — not published.';
     editorStatus.className = 'status ok';
     loadPostList();
   } catch (e) {
@@ -535,11 +644,16 @@ deleteBtn.addEventListener('click', async () => {
   editorStatus.textContent = 'Deleting…';
   editorStatus.className = 'status';
   try {
-    const postFile = await getFile(`posts/${editingSlug}.html`);
-    if (postFile) await deleteFile(`posts/${editingSlug}.html`, postFile.sha, `Delete post: ${fTitle.value}`);
-    const indexFile = await getFile('index.html');
-    const updatedIndex = removeListItem(indexFile.content, editingSlug);
-    await putFile('index.html', updatedIndex, indexFile.sha, `Remove post from list: ${fTitle.value}`);
+    if (editingType === 'draft') {
+      const draftFile = await getFile(`drafts/${editingSlug}.html`);
+      if (draftFile) await deleteFile(`drafts/${editingSlug}.html`, draftFile.sha, `Delete draft: ${fTitle.value}`);
+    } else {
+      const postFile = await getFile(`posts/${editingSlug}.html`);
+      if (postFile) await deleteFile(`posts/${editingSlug}.html`, postFile.sha, `Delete post: ${fTitle.value}`);
+      const indexFile = await getFile('index.html');
+      const updatedIndex = removeListItem(indexFile.content, editingSlug);
+      await putFile('index.html', updatedIndex, indexFile.sha, `Remove post from list: ${fTitle.value}`);
+    }
     editorPanel.style.display = 'none';
     loadPostList();
   } catch (e) {

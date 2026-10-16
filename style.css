@@ -12,6 +12,7 @@
   --max-width: 680px;
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --serif: Charter, "Iowan Old Style", Georgia, serif;
 }
 
 * {
@@ -269,11 +270,17 @@ article img {
   border: 1px solid var(--border);
 }
 
+[data-field="body"] {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+}
+
 blockquote {
   margin: 1.5rem 0;
   padding: 0.25rem 0 0.25rem 1rem;
   border-left: 3px solid var(--accent);
   color: var(--muted);
+  font-family: var(--serif);
 }
 
 footer {

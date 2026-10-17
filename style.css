@@ -305,20 +305,23 @@ footer a {
 
 .subscribe-btn {
   display: inline-block;
-  margin-bottom: 1rem;
-  padding: 0.3rem 0.8rem;
-  border: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+  padding: 0.6rem 1.4rem;
+  border: 1px solid var(--accent);
   border-radius: 999px;
+  background: var(--accent-soft);
   font-family: var(--serif);
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
   text-decoration: none;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .subscribe-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .back-link {

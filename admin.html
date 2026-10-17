@@ -145,6 +145,7 @@ const REPO = 'tobias-blog';
 const BRANCH = 'main';
 const API = 'https://api.github.com';
 const TOKEN_KEY = 'tobias_blog_pat';
+const SITE_URL = 'https://tobias-blog-mu.vercel.app';
 
 function b64Encode(str) {
   return btoa(unescape(encodeURIComponent(str)));
@@ -365,6 +366,51 @@ function removeListItem(raw, slug) {
   return raw.replace(itemRe, '');
 }
 
+const FEED_SKELETON = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Tobias' Blog</title>
+    <link>${SITE_URL}/</link>
+    <description>Incomplete thoughts and ideas</description>
+    <language>en-us</language>
+  </channel>
+</rss>
+`;
+
+function toRfc822(longDate) {
+  return new Date(longDate).toUTCString();
+}
+
+function renderFeedItem({ slug, title, date, excerpt, bodyHtml }) {
+  const url = `${SITE_URL}/posts/${slug}.html`;
+  return `    <item><!-- slug:${slug} -->
+      <title>${escapeHtml(title)}</title>
+      <link>${url}</link>
+      <guid>${url}</guid>
+      <pubDate>${toRfc822(date)}</pubDate>
+      <description>${escapeHtml(excerpt)}</description>
+      <content:encoded><![CDATA[
+        ${bodyHtml}
+      ]]></content:encoded>
+    </item>\n`;
+}
+
+// The slug marker is baked into the opening tag (like <li data-slug> in the post
+// list) so this regex anchors to one specific item instead of hunting forward
+// through the whole feed and potentially swallowing other items along the way.
+function replaceOrInsertFeedItem(xml, slug, newItemXml) {
+  const itemRe = new RegExp(`    <item><!-- slug:${slug} -->[\\s\\S]*?<\\/item>\\n`);
+  if (itemRe.test(xml)) {
+    return xml.replace(itemRe, newItemXml);
+  }
+  return xml.replace(/(<language>en-us<\/language>\n)/, `$1${newItemXml}`);
+}
+
+function removeFeedItem(xml, slug) {
+  const itemRe = new RegExp(`    <item><!-- slug:${slug} -->[\\s\\S]*?<\\/item>\\n`);
+  return xml.replace(itemRe, '');
+}
+
 async function listDraftSlugs() {
   const res = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/drafts?ref=${BRANCH}`, { headers: ghHeaders(), cache: 'no-store' });
   if (res.status === 404) return [];
@@ -573,13 +619,20 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     }
     // editingType 'draft' promotes to a brand-new posts/ file, so postSha stays null.
 
-    const postContent = renderPostFile({ title, date, body: mdToHtml(body), excerpt });
+    const bodyHtml = mdToHtml(body);
+    const postContent = renderPostFile({ title, date, body: bodyHtml, excerpt });
     await putFile(`posts/${slug}.html`, postContent, postSha, `${postSha ? 'Update' : 'Add'} post: ${title}`);
 
     const indexFile = await getFile('index.html');
     const newItemHtml = renderListItem({ slug, title, date, excerpt });
     const updatedIndex = replaceOrInsertListItem(indexFile.content, slug, newItemHtml);
     await putFile('index.html', updatedIndex, indexFile.sha, `Update post list: ${title}`);
+
+    const feedFile = await getFile('feed.xml');
+    const feedXml = feedFile ? feedFile.content : FEED_SKELETON;
+    const newFeedItem = renderFeedItem({ slug, title, date, excerpt, bodyHtml });
+    const updatedFeed = replaceOrInsertFeedItem(feedXml, slug, newFeedItem);
+    await putFile('feed.xml', updatedFeed, feedFile ? feedFile.sha : null, `Update RSS feed: ${title}`);
 
     if (wasDraft) {
       const draftFile = await getFile(`drafts/${editingSlug}.html`);
@@ -660,6 +713,11 @@ deleteBtn.addEventListener('click', async () => {
       const indexFile = await getFile('index.html');
       const updatedIndex = removeListItem(indexFile.content, editingSlug);
       await putFile('index.html', updatedIndex, indexFile.sha, `Remove post from list: ${fTitle.value}`);
+      const feedFile = await getFile('feed.xml');
+      if (feedFile) {
+        const updatedFeed = removeFeedItem(feedFile.content, editingSlug);
+        await putFile('feed.xml', updatedFeed, feedFile.sha, `Remove from RSS feed: ${fTitle.value}`);
+      }
     }
     editorPanel.style.display = 'none';
     loadPostList();

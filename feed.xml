@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Tobias' Blog</title>
+    <link>https://tobias-blog-mu.vercel.app/</link>
+    <description>Incomplete thoughts and ideas</description>
+    <language>en-us</language>
+    <item><!-- slug:seed-investing-has-lost-its-soul -->
+      <title>Seed investing has lost its soul</title>
+      <link>https://tobias-blog-mu.vercel.app/posts/seed-investing-has-lost-its-soul.html</link>
+      <guid>https://tobias-blog-mu.vercel.app/posts/seed-investing-has-lost-its-soul.html</guid>
+      <pubDate>Tue, 06 Oct 2026 00:00:00 GMT</pubDate>
+      <description>Investors are chasing the wrong alpha</description>
+      <content:encoded><![CDATA[
+        <p>In today's era of venture capital, one game reigns supreme. Certain teams and companies are anointed by a prominent VC firm from the get-go. They raise a large seed round. The signal of a great brand firm attracts more high-quality capital, and the company becomes consensus. The more consensus, the more capital. Before too long, the company has raised more money than anyone else in the category can, and capital in itself becomes a moat. This pattern of "kingmaking" is commonplace today. And overall, we seem to be at an extremely consensus moment in seed investing. Hot deals are really, really hot. And everything else is, well, not.</p>
+        <p>This behavior is rational. Market validation de-risks an investment, or at least justifies it. There is a natural comfort in investing in companies that other smart people have deemed to be good investments. "No one gets fired for buying IBM" applies to co-investing with Sequoia as well.</p>
+        <p>Investors are also incentivized to behave this way. Venture is a long game, and the central near-term performance milestone we have is markups. Markups require investing in what downstream investors find compelling, leading to early-stage investors approximating what they think is interesting to others in order to decide what is interesting for themselves.</p>
+        <p>To me, despite its logic, this form of seed investing is depressingly mindless, and dare I say, against the very soul of seed-stage venture. Even more importantly, though, I think it is actually a bad strategy for many investors because it nets market beta, not market alpha.</p>
+        <p>In theory, one core job of a seed investor is to have a point of view on a market opportunity before the rest of the market does. This is their alpha. They know something others don't, and invest against that unique insight. I'll call this insights alpha.</p>
+        <p>In practice, this is a rarity in today's world. Almost everyone plays the game described above, chasing the consensus, which requires differentiated access. This is a game of access as alpha. When there is a flurry of demand in a funding round, the implicit market bet is that access - at that moment in time - is alpha. It may sometimes be, but save for exceptional cases, it is usually beta, an efficient market opportunity with an expected value that does not outperform the market overall.</p>
+        <p>Unfortunately, I think VCs generally have much less access alpha than they think they do. Access alpha is having led Assaf Rappaport's seed round in Adallom before Wiz. Access alpha is having founded Prod. Access alpha is sitting on the board of Ramp and knowing who the top people at the company are. Access alpha is rare, and it accrues to big name VCs, influential individuals, and investors with legitimate track records and relationships. Achieving access alpha takes big wins and a long career of relationship building. And, it has become increasingly difficult to achieve, given the growth of the multi-stage platforms and competition in early-stage venture.</p>
+        <p>Insights alpha, though, is attainable. Technology is changing faster than ever before, meaning disruption is more frequent. The cycles are shorter. The changes are more dramatic. There is actually more opportunity, not less, to see around corners and make bets on the future given the pace of change. While most investors are making the same predictions about what is 3-6 months out, fewer are wildly diverging on what is 6-12 months out. But some of those few will be right, and that is alpha.</p>
+        <p>Focusing on insights alpha does not conflict with being founder-first. In fact, having a market POV focuses your thinking and sharpens a prepared mind for the right opportunities, putting you in a better position to win competitive deals. Working with top founders needs to be earned, and having insights and a worldview goes a long way.</p>
+        <p>The merits of this approach have played out within our portfolio at Primary. Many of the least consensus, hardest-to-underwrite seed investments we've made have been our best. The age-old cliche that it's best to be "non-consensus and right" really is true, and despite how competitive the market is, there is still room for that. Many know this truism, but very few live by it.</p>
+        <p>It is hard. We struggle with it constantly at Primary, and my view is that being a first principles investor is a lifelong goal that you work towards, not an on/off switch. But founders deserve this kind of thinking, and the startup ecosystem overall will benefit from early-stage investors tolerating more risk, making bigger bets, and most of all, departing from the consensus. What is seed investing for anyway, if not for that.</p>
+      ]]></content:encoded>
+    </item>
+  </channel>
+</rss>

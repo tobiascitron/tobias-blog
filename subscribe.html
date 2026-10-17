@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Subscribe — Tobias Citron</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .subscribe-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .subscribe-form input[type=email] {
+      flex: 1;
+      min-width: 220px;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card-bg);
+      color: var(--fg);
+    }
+    .subscribe-form input[type=email]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .subscribe-form input[type=submit] {
+      appearance: none;
+      -webkit-appearance: none;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background-color: var(--accent);
+      background-image: var(--gradient);
+      color: #fff;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .subscribe-form input[type=submit]:hover {
+      opacity: 0.85;
+    }
+    .subscribe-hint {
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">Tobias' Blog</a></h1>
+    <p>Incomplete thoughts and ideas</p>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about.html">About</a>
+      <a href="/subscribe.html">Subscribe</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Subscribe</h1>
+    <p>Get new posts by email, whenever I write something.</p>
+
+    <form class="subscribe-form"
+      action="https://buttondown.com/api/emails/embed-subscribe/citron"
+      method="post"
+      target="popupwindow"
+      onsubmit="window.open('https://buttondown.com/citron', 'popupwindow')"
+    >
+      <input type="email" name="email" id="bd-email" placeholder="your@email.com" required>
+      <input type="submit" value="Subscribe">
+    </form>
+    <p class="subscribe-hint">No spam, unsubscribe anytime.</p>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Tobias Citron. Built with plain HTML.</p>
+  </footer>
+</body>
+</html>
